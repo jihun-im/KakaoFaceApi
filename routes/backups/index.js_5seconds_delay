@@ -1,0 +1,199 @@
+var express = require('express');
+var request = require('request');
+var router = express.Router();
+
+/* GET home page. */
+router.get('/', function(req, res, next) {
+  res.render('index', { title: 'Express' });
+});
+
+router.get('/keyboard', function(req, res, next) {
+	var resultObject = new Object();
+
+	resultObject.type = "buttons";
+
+	//var buttonArray = ["1", "2", "3"];
+	var buttonArray = new Array();
+
+	buttonArray.push("도움말");
+	buttonArray.push("맞춤법");
+	buttonArray.push("타이머");
+
+	resultObject.buttons = buttonArray;
+
+	var resultJson = JSON.stringify(resultObject);
+
+	res.send(resultJson);
+});
+
+// 메시지 수신 및 자동응답 API
+router.post('/message', function(req, res, next){
+	var user_key = req.body.user_key;
+	var type = req.body.type;
+	var content = req.body.content;
+
+	console.log("user_key : " + user_key);
+	console.log("type : " + type);
+	console.log("content : " + content);
+
+	var resultObject = new Object();
+	var messageObject = new Object();
+	var text = "";
+	var isTherePhoto = false;
+	var isThereLink = false;
+	var isThereNextMessage = false;
+	var timerValue = 0;
+	var faceJson = "";
+	var timerHandler;
+
+        if(type=="text") {
+		switch (content) {
+			case "도움말":
+			case "ㄷㅇㅁ":
+		        	        text = "안녕하세요 바나나리액티브입니다\n1. 도움말(ㄷㅇㅁ)\n도움말을 출력합니다 \n" +
+                                	        "2. 맞춤법(ㅁㅊㅂ)\n" + "다음 입력하는 문장에대해 맞춤법을 수정하여 반환\n" +
+                                        	"3. 타이머(ㅌㅇㅁ)\n타이머10 이라고 치면 10분후에 카톡을보내드려요\n" +
+	                                        "4. 그외 가능한것들: 개고양이사진구분/키워드치면해당이미지를바로보여줌" + 
+						"/구글이미지검색/누구기가지니등에개발자API뚤려있으면연동가능/10분후알려줘"
+					break;
+			case "맞춤법":
+			case "ㅁㅊㅂ":
+			case "ㅁ":
+					text = "맞춤법을 확인할 내용을 입력하세요 " + user_key + "님";
+					break;
+			case "타이머":
+			case "ㅌㅇㅁ":
+					text = "x분후 알려드리겠습니다";
+					break;
+		}
+
+        	messageObject.text = text;
+	        resultObject.message = messageObject;
+	        var resultJson = JSON.stringify(resultObject);
+	        res.send(resultJson);
+                console.log(resultJson)
+
+
+	} else if(type=="photo") {
+
+		// For Face API
+		// Set the headers
+		var headers = {
+		    "Content-Type":     "application/json",
+		    "Ocp-Apim-Subscription-Key":    "447ccc9953ed42c7ba005b77875c65ae"
+		}
+
+		var targetUrl = {
+		    url: content
+		}
+
+		var options = {
+		    // possible attributes: age,gender,smile,facialHair,glasses,emotion
+		    url: 'https://westus.api.cognitive.microsoft.com/face/v1.0/detect?returnFaceId=false&returnFaceLandmarks=false&returnFaceAttributes=age,gender,smile,glasses',
+		    method: 'POST',
+		    headers: headers,
+		    json: { 'url': content }
+	   	    //json: { 'url': 'http://dn-m.talk.kakao.com/talkm/oWzaP6dFkk/64c5qlfkG1kavu3lsPNxzk/i_gydspawvvzja.jpg' }
+		}
+		
+		// Start the request
+		request(options, function (error, response, body) {
+		    if (!error && response.statusCode == 200) {
+		        // Print out the response body
+		        console.log("\nsuccessful\n")
+			console.log(body);
+			faceJson = body;
+		    } else {
+			console.log("error--\n" + body + error)
+		    }
+		})
+                timerHandler = setTimeout(function(){ 
+			try {
+			var age = faceJson[0].faceAttributes.age + ""
+			var gender = faceJson[0].faceAttributes.gender + ""
+			var smile = faceJson[0].faceAttributes.smile + ""
+
+			//messageObject.text = JSON.stringify(faceJson);
+			text = "나이 : " + age;
+			if ( gender == "male" ) {
+	                        text = text.concat("\n성별 : 남자");
+			} else {
+	                        text = text.concat("\n성별 : 여자");
+			}
+			text = text.concat("\n미소 : " + (""+smile*100).substring(0,4) + "%");
+			messageObject.text = text;
+        	        resultObject.message = messageObject;
+	                var resultJson = JSON.stringify(resultObject);
+			console.log(resultJson)
+                 	res.send(resultJson);
+			} catch(err) {
+				messageObject.text = "얼굴을 찾을수가 없습니다. 다시 시도해주세요";
+	                        resultObject.message = messageObject;
+	                        var resultJson = JSON.stringify(resultObject);
+	                        console.log(resultJson)
+        	                res.send(resultJson);
+			}
+		}, 5000);
+
+	}
+
+
+	if(isTherePhoto){
+		var photoObject = new Object();
+
+		var url = "https://photo.src";
+		var width = 640;
+		var height = 480;
+
+		photoObject.url = url;
+		photoObject.width = width;
+		photoObject.height = height;
+		messageObject.photo =  photoObject;
+	}
+
+	if(isThereLink){
+		var messageButtonObject = new Object();
+
+		var label = "구글 설문지";
+		var url = "https://www.korchid.com";
+
+		messageButtonObject.label = label;
+		messageButtonObject.url = url;
+
+		messageObject.message_button = messageButtonObject;
+	}
+
+});
+
+
+
+
+
+
+// 친구 추가 알림 API
+router.post(['/friend'], function(req, res, next){
+	var user_key = req.body.user_key;
+	//console.log("user_key : " + user_key);
+
+	res.send("SUCCESS");
+});
+
+// 친구 차단 알림 API
+router.delete(['/friend/:user_key'], function(req, res, next){
+	var user_key = req.params.user_key;
+	//console.log("user_key : " + user_key);
+
+	res.send("SUCCESS");
+});
+
+
+// 채팅방 나가기
+router.delete(['/chat_room/:user_key'], function(req, res, next){
+	var user_key = req.params.user_key;
+	//console.log("user_key : " + user_key);
+
+	res.send("SUCCESS");
+});
+
+
+module.exports = router;

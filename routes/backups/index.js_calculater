@@ -1,0 +1,241 @@
+var express = require('express');
+var request = require('request');
+var router = express.Router();
+var Calc = require('./Calc.js');
+
+var check = require('./../node_modules/ko-spellchecker/index.js')
+
+/* GET home page. */
+router.get('/', function(req, res, next) {
+  res.render('index', { title: 'Express' });
+});
+
+router.get('/keyboard', function(req, res, next) {
+	var resultObject = new Object();
+
+	resultObject.type = "buttons";
+
+	//var buttonArray = ["1", "2", "3"];
+	var buttonArray = new Array();
+
+	buttonArray.push("도움말");
+	buttonArray.push("맞춤법");
+	buttonArray.push("친구에게추천");
+
+	resultObject.buttons = buttonArray;
+
+	var resultJson = JSON.stringify(resultObject);
+
+	res.send(resultJson);
+});
+
+// 메시지 수신 및 자동응답 API
+router.post('/message', function(req, res, next){
+	var user_key = req.body.user_key;
+	var type = req.body.type;
+	var content = req.body.content;
+
+	console.log("user_key : " + user_key);
+	console.log("type : " + type);
+	console.log("content : " + content);
+
+	var resultObject = new Object();
+	var messageObject = new Object();
+	var text = "";
+	var isTherePhoto = false;
+	var isThereLink = false;
+	var isThereNextMessage = false;
+	var timerValue = 0;
+	var faceJson = "";
+	var timerHandler;
+
+        if(type=="text") {
+		switch (content) {
+			case "ㄱ":  try{
+					console.log("asdsad");
+					check("외않됀데?", function(err,results) {
+						if(err) {
+							console.log("@@@@@@@fail");
+							text = "맞춤법 실패";
+							console.log(err);
+						}
+						console.log("@@@@@@@fail");
+						text = "맞춤법 성공";
+						console.log(results);
+					})
+				   } catch (err) {
+					console.log(err);
+				    }
+					break;
+			case "도움말":
+			case "ㄷㅇㅁ":
+		        	        text = "안녕하세요 자동응답서비스입니다\n1. 도움말(ㄷㅇㅁ)\n도움말을 출력합니다 \n" +
+                                	        "2. 맞춤법(ㅁㅊㅂ)\n" + "다음 입력하는 문장에대해 맞춤법을 수정하여 반환(TBD)\n" +
+                                        	"3. 사진인식\n사진을 전송하시면 나이와 성별을 구분하여 알려드립니다\n" +
+						"4. 계산기\n기본적인 계산기능을 제공해드립니다(입력예제:100000/3) \n" +
+						""
+					break;
+			case "맞춤법":
+			case "ㅁㅊㅂ":
+			case "ㅁ":
+					text = "맞춤법을 확인할 내용을 입력하세요 " + user_key + "님";
+					break;
+			case "타이머":
+			case "ㅌㅇㅁ":
+					text = "x분후 알려드리겠습니다";
+					break;
+			case "친구에게추천":
+					text = "https://plus.kakao.com/home/%40bananainc";
+					break;
+			default:
+var assert = require("assert"),
+    testExpression = "5+2*7",
+    calc = new Calc(testExpression);
+					function testCalc(exp) {
+		 			   return eval(calc.sanitize(exp));
+					}
+					var calResult = testCalc(content);
+					if(calResult+"" == "undefined") {
+						text = "알수없는 명령";
+					} else {
+						text = "계산기: " + calResult;
+					}
+			break;
+		}
+
+
+        	messageObject.text = text;
+	        resultObject.message = messageObject;
+	        var resultJson = JSON.stringify(resultObject);
+	        res.send(resultJson);
+                console.log(resultJson)
+
+
+	} else if(type=="photo") {
+
+		// For Face API
+		// Set the headers
+		var headers = {
+		    "Content-Type":     "application/json",
+		    "Ocp-Apim-Subscription-Key":    "447ccc9953ed42c7ba005b77875c65ae"
+		}
+
+		var targetUrl = {
+		    url: content
+		}
+
+		var options = {
+		    // possible attributes: age,gender,smile,facialHair,glasses,emotion
+		    url: 'https://westus.api.cognitive.microsoft.com/face/v1.0/detect?returnFaceId=false&returnFaceLandmarks=false&returnFaceAttributes=age,gender,smile,glasses',
+		    method: 'POST',
+		    headers: headers,
+		    json: { 'url': content }
+	   	    //json: { 'url': 'http://dn-m.talk.kakao.com/talkm/oWzaP6dFkk/64c5qlfkG1kavu3lsPNxzk/i_gydspawvvzja.jpg' }
+		}
+		
+		// Start the request
+		request(options, function (error, response, body) {
+		    if (!error && response.statusCode == 200) {
+		        // Print out the response body
+		        console.log("\nsuccessful\n")
+			console.log(body);
+			faceJson = body;
+		    } else {
+			console.log("error--\n" + body + error)
+		    }
+		    responseToKakao();
+		})
+                function responseToKakao(){ 
+			try {
+			var age = faceJson[0].faceAttributes.age + ""
+			var gender = faceJson[0].faceAttributes.gender + ""
+			var smile = faceJson[0].faceAttributes.smile + ""
+
+			//messageObject.text = JSON.stringify(faceJson);
+			text = "나이 : " + age;
+			if ( gender == "male" ) {
+	                        text = text.concat("\n성별 : 남자");
+			} else {
+	                        text = text.concat("\n성별 : 여자");
+			}
+			text = text.concat("\n미소 : " + (""+smile*100).substring(0,4) + "%");
+			messageObject.text = text;
+        	        resultObject.message = messageObject;
+	                var resultJson = JSON.stringify(resultObject);
+			console.log(resultJson)
+                 	res.send(resultJson);
+			} catch(err) {
+				messageObject.text = "얼굴을 찾을수가 없습니다. 다시 시도해주세요";
+	                        resultObject.message = messageObject;
+	                        var resultJson = JSON.stringify(resultObject);
+	                        console.log(resultJson)
+        	                res.send(resultJson);
+			}
+		}
+
+	}
+
+
+	if(isTherePhoto){
+		var photoObject = new Object();
+
+		var url = "https://photo.src";
+		var width = 640;
+		var height = 480;
+
+		photoObject.url = url;
+		photoObject.width = width;
+		photoObject.height = height;
+		messageObject.photo =  photoObject;
+	}
+
+	if(isThereLink){
+		var messageButtonObject = new Object();
+
+		var label = "구글 설문지";
+		var url = "https://www.korchid.com";
+
+		messageButtonObject.label = label;
+		messageButtonObject.url = url;
+
+		messageObject.message_button = messageButtonObject;
+	}
+
+});
+
+
+
+
+
+
+// 친구 추가 알림 API
+router.post(['/friend'], function(req, res, next){
+	var user_key = req.body.user_key;
+	//console.log("user_key : " + user_key);
+
+	res.send("SUCCESS");
+});
+
+// 친구 차단 알림 API
+router.delete(['/friend/:user_key'], function(req, res, next){
+	var user_key = req.params.user_key;
+	//console.log("user_key : " + user_key);
+
+	res.send("SUCCESS");
+});
+
+
+// 채팅방 나가기
+router.delete(['/chat_room/:user_key'], function(req, res, next){
+	var user_key = req.params.user_key;
+	//console.log("user_key : " + user_key);
+
+	res.send("SUCCESS");
+});
+
+
+
+
+
+
+module.exports = router;
